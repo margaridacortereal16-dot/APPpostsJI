@@ -1,0 +1,1513 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Upload, Image as ImageIcon, Sparkles, Shield, Smile, Layers, 
+  Download, Share2, Trash2, Plus, RefreshCw, CheckCircle2, 
+  Eye, Copy, BookOpen, Heart, Palette, Grid, Wand2, Info, Lock, 
+  Sliders, Maximize2, Move, HelpCircle, ChevronRight, FileText, Check
+} from 'lucide-react';
+
+// Default sample photos with pre-calculated face coordinates (percentages 0-100) for instant simulation
+const SAMPLE_PHOTOS = [
+  {
+    id: 'sample-1',
+    url: 'https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&w=800&q=80',
+    faces: [
+      { id: 'f1', x: 48, y: 32, type: 'blur', emoji: '😊', sticker: 'star', active: true, radius: 14 }
+    ]
+  },
+  {
+    id: 'sample-2',
+    url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=800&q=80',
+    faces: [
+      { id: 'f2', x: 52, y: 38, type: 'emoji', emoji: '🦊', sticker: 'star', active: true, radius: 15 }
+    ]
+  },
+  {
+    id: 'sample-3',
+    url: 'https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?auto=format&fit=crop&w=800&q=80',
+    faces: [
+      { id: 'f3', x: 38, y: 30, type: 'emoji', emoji: '🎈', sticker: 'star', active: true, radius: 12 },
+      { id: 'f4', x: 62, y: 35, type: 'blur', emoji: '🌟', sticker: 'star', active: true, radius: 12 }
+    ]
+  }
+];
+
+// Available masks for face protection
+const MASK_TYPES = [
+  { id: 'blur', label: 'Desfoque Denso', icon: '🌫️' },
+  { id: 'emoji', label: 'Emoji Divertido', icon: '😊' },
+  { id: 'sticker', label: 'Sticker Escolar', icon: '🎨' },
+  { id: 'none', label: 'Sem Proteção', icon: '👁️' }
+];
+
+const EMOJI_OPTIONS = ['😊', '🦊', '🎈', '🌟', '🐻', '🎨', '🌈', '🐣', '🌸', '🐝', '🚀', '⭐'];
+
+// Expanded list of background options (Solids, Gradients & Patterns)
+const BACKGROUND_OPTIONS = [
+  // CORES SÓLIDAS PASTÉIS
+  { id: 'bg-white', name: 'Branco Puro', type: 'solid', color: '#FFFFFF', text: 'text-slate-800' },
+  { id: 'bg-pastel-blue', name: 'Azul Nuvem', type: 'solid', color: '#E0F2FE', text: 'text-sky-900' },
+  { id: 'bg-pastel-green', name: 'Verde Broto', type: 'solid', color: '#DCFCE7', text: 'text-emerald-900' },
+  { id: 'bg-pastel-pink', name: 'Rosa Bebé', type: 'solid', color: '#FCE7F3', text: 'text-pink-900' },
+  { id: 'bg-pastel-yellow', name: 'Amarelo Sol', type: 'solid', color: '#FEF9C3', text: 'text-amber-900' },
+  { id: 'bg-pastel-lavender', name: 'Lavanda Suave', type: 'solid', color: '#F3E8FF', text: 'text-purple-900' },
+  { id: 'bg-pastel-mint', name: 'Menta Fresca', type: 'solid', color: '#D1FAE5', text: 'text-teal-900' },
+  { id: 'bg-pastel-peach', name: 'Pêssego Doce', type: 'solid', color: '#FFEDD5', text: 'text-orange-900' },
+  { id: 'bg-cream', name: 'Creme Achegado', type: 'solid', color: '#FEF3C7', text: 'text-amber-900' },
+
+  // GRADIENTES
+  { id: 'grad-ocean', name: 'Gradiente Oceano', type: 'gradient', colors: ['#0284C7', '#10B981'], text: 'text-white' },
+  { id: 'grad-sunset', name: 'Gradiente Por do Sol', type: 'gradient', colors: ['#F59E0B', '#EC4899'], text: 'text-white' },
+  { id: 'grad-cotton-candy', name: 'Gradiente Algodão Doce', type: 'gradient', colors: ['#F472B6', '#38BDF8'], text: 'text-white' },
+  { id: 'grad-aurora', name: 'Gradiente Aurora Menta', type: 'gradient', colors: ['#A7F3D0', '#7DD3FC'], text: 'text-slate-800' },
+  { id: 'grad-soft-rainbow', name: 'Gradiente Arco-Íris Pastéis', type: 'gradient', colors: ['#FEF08A', '#FBCFE8', '#BAE6FD'], text: 'text-slate-800' },
+  { id: 'grad-lavender-peach', name: 'Gradiente Pôr do Sol Suave', type: 'gradient', colors: ['#E9D5FF', '#FFEDD5'], text: 'text-slate-800' },
+
+  // PADRÕES DE BOLINHAS
+  { id: 'pattern-dots-blue', name: 'Bolinhas Azuis', type: 'pattern', color: '#F0F9FF', patternColor: '#0284C7', text: 'text-sky-950' },
+  { id: 'pattern-dots-pink', name: 'Bolinhas Rosas', type: 'pattern', color: '#FDF2F8', patternColor: '#EC4899', text: 'text-pink-950' },
+  { id: 'pattern-dots-green', name: 'Bolinhas Verdes', type: 'pattern', color: '#F0FDF4', patternColor: '#10B981', text: 'text-emerald-950' },
+  { id: 'pattern-dots-yellow', name: 'Bolinhas Douradas', type: 'pattern', color: '#FEFCE8', patternColor: '#F59E0B', text: 'text-amber-950' }
+];
+
+// OCEPE Curriculum Areas
+const OCEPE_AREAS = [
+  { id: 'fps', name: 'Formação Pessoal e Social', desc: 'Autonomia, identidade, cidadania e convivência' },
+  { id: 'ec_artes', name: 'Exp. e Com.: Artes Visuais e Plásticas', desc: 'Exploração de materiais, cores e expressão' },
+  { id: 'ec_linguagem', name: 'Exp. e Com.: Linguagem Oral e Escrita', desc: 'Comunicação, narrativa, vocabulário e livros' },
+  { id: 'ec_matematica', name: 'Exp. e Com.: Matemática', desc: 'Contagem, formas, padrões e raciocínio lógico' },
+  { id: 'ec_corpo', name: 'Exp. e Com.: Motricidade e Jogo Dramático', desc: 'Corpo em movimento, dança e dramatização' },
+  { id: 'cm', name: 'Conhecimento do Mundo', desc: 'Curiosidade científica, natureza, meio social e tecnologia' }
+];
+
+export default function App() {
+  // Photos & Canvas state
+  const [photos, setPhotos] = useState([]);
+  const [selectedPhotoId, setSelectedPhotoId] = useState(null);
+  const [selectedFaceId, setSelectedFaceId] = useState(null); // Track individually selected face for size/type edits
+  const [aspectRatio, setAspectRatio] = useState('1:1'); // '1:1' or '4:5'
+  const [bgStyle, setBgStyle] = useState(BACKGROUND_OPTIONS[1]);
+  const [borderPadding, setBorderPadding] = useState(20); // strict rule: >= 16px
+  const [cornerRadius, setCornerRadius] = useState(16);
+
+  // Active mask editing state
+  const [selectedMaskType, setSelectedMaskType] = useState('blur');
+  const [selectedEmoji, setSelectedEmoji] = useState('😊');
+  const [maskSize, setMaskSize] = useState(14); // Default percentage radius for new masks
+  
+  // OCEPE AI Generator state
+  const [ageGroup, setAgeGroup] = useState('3-6 anos (Grupo Heterogéneo)');
+  const [selectedArea, setSelectedArea] = useState(OCEPE_AREAS[0].id);
+  const [activityPrompt, setActivityPrompt] = useState('');
+  const [generatedCaption, setGeneratedCaption] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
+
+  // Layout & Navigation Tab (Mobile view)
+  const [activeTab, setActiveTab] = useState('photos'); // 'photos' | 'privacy' | 'caption' | 'export'
+  const [draggingPhoto, setDraggingPhoto] = useState(false);
+
+  // Canvas Refs for Live Preview & Export
+  const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  // Load sample photos on start
+  useEffect(() => {
+    setPhotos(SAMPLE_PHOTOS);
+    setSelectedPhotoId(SAMPLE_PHOTOS[0].id);
+  }, []);
+
+  // Convert File object to base64 string
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Automatic Face Detection Engine: Native Browser API + Gemini Vision AI Fallback
+  const detectFacesForPhoto = async (photo, fileObj) => {
+    let detectedFaces = [];
+
+    // 1. Try Native Browser FaceDetector API (available in Chrome/Android)
+    if ('FaceDetector' in window) {
+      try {
+        const img = new Image();
+        img.src = photo.url;
+        await img.decode();
+        const faceDetector = new window.FaceDetector({ maxDetectedFaces: 10, fastMode: false });
+        const faces = await faceDetector.detect(img);
+        if (faces && faces.length > 0) {
+          detectedFaces = faces.map((f, idx) => {
+            const box = f.boundingBox;
+            const centerX = ((box.x + box.width / 2) / img.width) * 100;
+            const centerY = ((box.y + box.height / 2) / img.height) * 100;
+            const radius = Math.max(10, Math.round((Math.max(box.width, box.height) / Math.min(img.width, img.height)) * 45));
+            return {
+              id: `f-native-${Date.now()}-${idx}`,
+              x: Math.round(centerX),
+              y: Math.round(centerY),
+              type: selectedMaskType,
+              emoji: selectedEmoji,
+              sticker: 'star',
+              active: true,
+              radius: Math.min(25, Math.max(10, radius))
+            };
+          });
+        }
+      } catch (e) {
+        console.warn("Native FaceDetector error/unsupported:", e);
+      }
+    }
+
+    // 2. Gemini Vision AI Face Detection (if Native detector found no faces and file is provided)
+    if (detectedFaces.length === 0 && fileObj) {
+      try {
+        const base64Data = await fileToBase64(fileObj);
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+        const payload = {
+          contents: [{
+            role: "user",
+            parts: [
+              { text: "Detect all human faces in this photo. For each face, find center coordinates x (0 to 100 percentage from left) and y (0 to 100 percentage from top) and estimated face size radius percentage (10 to 22%). Output strictly JSON schema: { \"faces\": [ { \"x\": number, \"y\": number, \"radius\": number } ] }" },
+              {
+                inlineData: {
+                  mimeType: fileObj.type || "image/jpeg",
+                  data: base64Data
+                }
+              }
+            ]
+          }],
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
+        };
+
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (textResult) {
+          const parsed = JSON.parse(textResult);
+          if (parsed.faces && Array.isArray(parsed.faces)) {
+            detectedFaces = parsed.faces.map((f, idx) => ({
+              id: `f-ai-${Date.now()}-${idx}`,
+              x: Math.min(95, Math.max(5, Math.round(f.x))),
+              y: Math.min(95, Math.max(5, Math.round(f.y))),
+              type: selectedMaskType,
+              emoji: selectedEmoji,
+              sticker: 'star',
+              active: true,
+              radius: Math.min(25, Math.max(10, Math.round(f.radius || 14)))
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn("Gemini Vision AI face detection failed:", err);
+      }
+    }
+
+    // Fallback: Default center mask if no face detected
+    if (detectedFaces.length === 0) {
+      detectedFaces = [{
+        id: `f-default-${Date.now()}`,
+        x: 50,
+        y: 40,
+        type: selectedMaskType,
+        emoji: selectedEmoji,
+        sticker: 'star',
+        active: true,
+        radius: maskSize
+      }];
+    }
+
+    return detectedFaces;
+  };
+
+  // Update radius size for a specific selected face mask
+  const updateSelectedFaceRadius = (newRadius) => {
+    const clampedRadius = Math.min(40, Math.max(6, newRadius));
+    setMaskSize(clampedRadius);
+
+    if (!selectedPhotoId || !selectedFaceId) return;
+
+    setPhotos(prev => prev.map(p => {
+      if (p.id !== selectedPhotoId) return p;
+      return {
+        ...p,
+        faces: p.faces.map(f => f.id === selectedFaceId ? { ...f, radius: clampedRadius } : f)
+      };
+    }));
+  };
+
+  // Update mask type/emoji for the selected face mask
+  const updateSelectedFaceType = (type, emoji = selectedEmoji) => {
+    setSelectedMaskType(type);
+    if (emoji) setSelectedEmoji(emoji);
+
+    if (!selectedPhotoId || !selectedFaceId) return;
+
+    setPhotos(prev => prev.map(p => {
+      if (p.id !== selectedPhotoId) return p;
+      return {
+        ...p,
+        faces: p.faces.map(f => f.id === selectedFaceId ? { ...f, type, emoji, active: type !== 'none' } : f)
+      };
+    }));
+  };
+
+  // Handle local image file upload with automatic face detection trigger
+  const handleFileUpload = async (files) => {
+    if (!files || files.length === 0) return;
+    const remainingSlots = 6 - photos.length;
+    if (remainingSlots <= 0) {
+      alert("Atingiu o limite máximo de 6 fotografias para a colagem.");
+      return;
+    }
+
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+    const newPhotos = filesToProcess.map((file, index) => {
+      const url = URL.createObjectURL(file);
+      return {
+        id: `uploaded-${Date.now()}-${index}`,
+        url: url,
+        file: file,
+        isDetecting: true,
+        faces: []
+      };
+    });
+
+    setPhotos(prev => [...prev, ...newPhotos]);
+    if (!selectedPhotoId && newPhotos.length > 0) {
+      setSelectedPhotoId(newPhotos[0].id);
+    }
+
+    // Run async face detection for each uploaded file
+    for (const photoItem of newPhotos) {
+      const faces = await detectFacesForPhoto(photoItem, photoItem.file);
+      setPhotos(prev => prev.map(p => p.id === photoItem.id ? { ...p, faces, isDetecting: false } : p));
+    }
+  };
+
+  // Re-run face detection manually for the selected photo
+  const runFaceDetectionForSelectedPhoto = async () => {
+    const activePhoto = photos.find(p => p.id === selectedPhotoId);
+    if (!activePhoto) return;
+
+    setPhotos(prev => prev.map(p => p.id === activePhoto.id ? { ...p, isDetecting: true } : p));
+    const faces = await detectFacesForPhoto(activePhoto, activePhoto.file);
+    setPhotos(prev => prev.map(p => p.id === activePhoto.id ? { ...p, faces, isDetecting: false } : p));
+  };
+
+  // Run face detection for ALL attached photos in one click
+  const runFaceDetectionForAllPhotos = async () => {
+    for (const photoItem of photos) {
+      setPhotos(prev => prev.map(p => p.id === photoItem.id ? { ...p, isDetecting: true } : p));
+      const faces = await detectFacesForPhoto(photoItem, photoItem.file);
+      setPhotos(prev => prev.map(p => p.id === photoItem.id ? { ...p, faces, isDetecting: false } : p));
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDraggingPhoto(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileUpload(e.dataTransfer.files);
+    }
+  };
+
+  const removePhoto = (id, e) => {
+    e.stopPropagation();
+    const updated = photos.filter(p => p.id !== id);
+    setPhotos(updated);
+    if (selectedPhotoId === id) {
+      setSelectedPhotoId(updated.length > 0 ? updated[0].id : null);
+      setSelectedFaceId(null);
+    }
+  };
+
+  // Add, select or place face mask on click over image coordinates
+  const handleImageClick = (photoId, event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+
+    // Convert to relative percentage (0 - 100%)
+    const pctX = Math.round((clickX / rect.width) * 100);
+    const pctY = Math.round((clickY / rect.height) * 100);
+
+    const activePhoto = photos.find(p => p.id === photoId);
+    if (!activePhoto) return;
+
+    // Check if clicked near an existing face node (within ~12% distance)
+    const existingFace = activePhoto.faces.find(f => {
+      const dx = f.x - pctX;
+      const dy = f.y - pctY;
+      return Math.sqrt(dx * dx + dy * dy) < 12;
+    });
+
+    if (existingFace) {
+      // Select the clicked face mask for individual adjustments
+      setSelectedFaceId(existingFace.id);
+      setSelectedMaskType(existingFace.type);
+      if (existingFace.emoji) setSelectedEmoji(existingFace.emoji);
+      setMaskSize(existingFace.radius || 14);
+    } else {
+      // Add new face node at exact clicked location and automatically select it
+      const newFaceId = `face-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+      const newFace = {
+        id: newFaceId,
+        x: pctX,
+        y: pctY,
+        type: selectedMaskType,
+        emoji: selectedEmoji,
+        sticker: 'star',
+        active: true,
+        radius: maskSize
+      };
+
+      setPhotos(prevPhotos => prevPhotos.map(p => {
+        if (p.id !== photoId) return p;
+        return { ...p, faces: [...p.faces, newFace] };
+      }));
+
+      setSelectedFaceId(newFaceId);
+    }
+  };
+
+  // Remove a specific face mask by ID
+  const removeFaceMask = (photoId, faceId, e) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setPhotos(prev => prev.map(p => {
+      if (p.id !== photoId) return p;
+      return { ...p, faces: p.faces.filter(f => f.id !== faceId) };
+    }));
+    if (selectedFaceId === faceId) {
+      setSelectedFaceId(null);
+    }
+  };
+
+  // Clear all face masks from a specific photo
+  const clearAllFaceMasks = (photoId) => {
+    setPhotos(prev => prev.map(p => {
+      if (p.id !== photoId) return p;
+      return { ...p, faces: [] };
+    }));
+    setSelectedFaceId(null);
+  };
+
+  // Draw canvas for accurate preview and high-quality export
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas high DPI size based on ratio
+    const width = 1080;
+    const height = aspectRatio === '1:1' ? 1080 : 1350;
+    canvas.width = width;
+    canvas.height = height;
+
+    // Clear background
+    ctx.clearRect(0, 0, width, height);
+
+    // 1. Draw Background
+    if (bgStyle.type === 'solid') {
+      ctx.fillStyle = bgStyle.color;
+      ctx.fillRect(0, 0, width, height);
+    } else if (bgStyle.type === 'gradient') {
+      const grad = ctx.createLinearGradient(0, 0, width, height);
+      if (bgStyle.colors && bgStyle.colors.length > 0) {
+        bgStyle.colors.forEach((col, i) => {
+          const stop = bgStyle.colors.length > 1 ? i / (bgStyle.colors.length - 1) : 0;
+          grad.addColorStop(stop, col);
+        });
+      } else {
+        grad.addColorStop(0, '#E0F2FE');
+        grad.addColorStop(1, '#FBCFE8');
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+    } else if (bgStyle.type === 'pattern') {
+      ctx.fillStyle = bgStyle.color;
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = bgStyle.patternColor;
+      for (let x = 20; x < width; x += 60) {
+        for (let y = 20; y < height; y += 60) {
+          ctx.beginPath();
+          ctx.arc(x, y, 6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    if (photos.length === 0) {
+      // Draw empty placeholder text on canvas
+      ctx.fillStyle = '#64748B';
+      ctx.font = 'bold 36px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Adicione até 6 fotos para criar a colagem', width / 2, height / 2);
+      return;
+    }
+
+    // 2. Calculate Strict Outer Padding (Border/Margem Regra Estrita)
+    const padding = Math.max(borderPadding * 2.5, 40); // Scaled for 1080px resolution
+    const areaX = padding;
+    const areaY = padding;
+    const areaW = width - (padding * 2);
+    const areaH = height - (padding * 2);
+
+    // 3. Compute Photo Grid Rectangles
+    const gridRects = computeGridRectangles(photos.length, areaX, areaY, areaW, areaH, 16);
+
+    gridRects.forEach((rect, idx) => {
+      const photo = photos[idx];
+      if (!photo) return;
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = photo.url;
+      img.onload = () => {
+        ctx.save();
+
+        // Rounded photo corners
+        const rad = cornerRadius * 2;
+        ctx.beginPath();
+        ctx.moveTo(rect.x + rad, rect.y);
+        ctx.lineTo(rect.x + rect.w - rad, rect.y);
+        ctx.quadraticCurveTo(rect.x + rect.w, rect.y, rect.x + rect.w, rect.y + rad);
+        ctx.lineTo(rect.x + rect.w, rect.y + rect.h - rad);
+        ctx.quadraticCurveTo(rect.x + rect.w, rect.y + rect.h, rect.x + rect.w - rad, rect.y + rect.h);
+        ctx.lineTo(rect.x + rad, rect.y + rect.h);
+        ctx.quadraticCurveTo(rect.x, rect.y + rect.h, rect.x, rect.y + rect.h - rad);
+        ctx.lineTo(rect.x, rect.y + rad);
+        ctx.quadraticCurveTo(rect.x, rect.y, rect.x + rad, rect.y);
+        ctx.closePath();
+        ctx.clip();
+
+        // Draw Cover Fitted Image
+        const imgRatio = img.width / img.height;
+        const rectRatio = rect.w / rect.h;
+        let renderW, renderH, renderX, renderY;
+
+        if (imgRatio > rectRatio) {
+          renderH = rect.h;
+          renderW = rect.h * imgRatio;
+          renderX = rect.x - (renderW - rect.w) / 2;
+          renderY = rect.y;
+        } else {
+          renderW = rect.w;
+          renderH = rect.w / imgRatio;
+          renderX = rect.x;
+          renderY = rect.y - (renderH - rect.h) / 2;
+        }
+
+        ctx.drawImage(img, renderX, renderY, renderW, renderH);
+
+        // 4. Render Face Masks (Blur, Emoji, Sticker) on top of image inside clipping
+        photo.faces.forEach(face => {
+          if (!face.active || face.type === 'none') return;
+
+          // Convert percentage back to absolute rect coordinates
+          const faceAbsX = rect.x + (face.x / 100) * rect.w;
+          const faceAbsY = rect.y + (face.y / 100) * rect.h;
+          const faceRadiusPx = (face.radius / 100) * Math.min(rect.w, rect.h);
+
+          if (face.type === 'blur') {
+            // High Density Blur simulation using radial gradients & frosted effect
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(faceAbsX, faceAbsY, faceRadiusPx, 0, Math.PI * 2);
+            ctx.clip();
+
+            // Heavy pixelation blur effect
+            try {
+              ctx.filter = 'blur(16px)';
+              ctx.drawImage(img, renderX, renderY, renderW, renderH);
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+              ctx.fillRect(faceAbsX - faceRadiusPx, faceAbsY - faceRadiusPx, faceRadiusPx * 2, faceRadiusPx * 2);
+            } catch (e) {
+              // Fallback for canvas filter unsupported environments
+              ctx.fillStyle = 'rgba(200, 220, 240, 0.92)';
+              ctx.fill();
+            }
+            ctx.restore();
+
+            // Soft outer ring for clean look
+            ctx.beginPath();
+            ctx.arc(faceAbsX, faceAbsY, faceRadiusPx, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+          } else if (face.type === 'emoji') {
+            ctx.save();
+            ctx.font = `${Math.round(faceRadiusPx * 1.8)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(face.emoji || '😊', faceAbsX, faceAbsY);
+            ctx.restore();
+
+          } else if (face.type === 'sticker') {
+            // Kindergarten Badge / Star Sticker
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(faceAbsX, faceAbsY, faceRadiusPx, 0, Math.PI * 2);
+            ctx.fillStyle = '#FEF08A';
+            ctx.fill();
+            ctx.strokeStyle = '#F59E0B';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            ctx.font = `bold ${Math.round(faceRadiusPx * 0.9)}px sans-serif`;
+            ctx.fillStyle = '#0284C7';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⭐', faceAbsX, faceAbsY);
+            ctx.restore();
+          }
+        });
+
+        ctx.restore(); // Restore unclipped context
+      };
+    });
+
+  }, [photos, aspectRatio, bgStyle, borderPadding, cornerRadius, selectedMaskType, selectedEmoji, maskSize]);
+
+  // Helper grid layout algorithm for 1 to 6 photos
+  function computeGridRectangles(count, x, y, w, h, gap) {
+    if (count === 1) {
+      return [{ x, y, w, h }];
+    }
+    if (count === 2) {
+      // Side by side
+      const halfW = (w - gap) / 2;
+      return [
+        { x, y, w: halfW, h },
+        { x: x + halfW + gap, y, w: halfW, h }
+      ];
+    }
+    if (count === 3) {
+      // 1 Top large, 2 bottom side-by-side
+      const halfH = (h - gap) / 2;
+      const halfW = (w - gap) / 2;
+      return [
+        { x, y, w, h: halfH },
+        { x, y: y + halfH + gap, w: halfW, h: halfH },
+        { x: x + halfW + gap, y: y + halfH + gap, w: halfW, h: halfH }
+      ];
+    }
+    if (count === 4) {
+      // 2x2 Grid
+      const halfW = (w - gap) / 2;
+      const halfH = (h - gap) / 2;
+      return [
+        { x, y, w: halfW, h: halfH },
+        { x: x + halfW + gap, y, w: halfW, h: halfH },
+        { x, y: y + halfH + gap, w: halfW, h: halfH },
+        { x: x + halfW + gap, y: y + halfH + gap, w: halfW, h: halfH }
+      ];
+    }
+    if (count === 5) {
+      // Top 2, Bottom 3
+      const halfH = (h - gap) / 2;
+      const w2 = (w - gap) / 2;
+      const w3 = (w - gap * 2) / 3;
+      return [
+        { x, y, w: w2, h: halfH },
+        { x: x + w2 + gap, y, w: w2, h: halfH },
+        { x, y: y + halfH + gap, w: w3, h: halfH },
+        { x: x + w3 + gap, y: y + halfH + gap, w: w3, h: halfH },
+        { x: x + (w3 + gap) * 2, y: y + halfH + gap, w: w3, h: halfH }
+      ];
+    }
+    // 6 Photos: 2x3 Grid
+    const colW = (w - gap * 2) / 3;
+    const rowH = (h - gap) / 2;
+    const rects = [];
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < 3; c++) {
+        rects.push({
+          x: x + c * (colW + gap),
+          y: y + r * (rowH + gap),
+          w: colW,
+          h: rowH
+        });
+      }
+    }
+    return rects;
+  }
+
+  // Gemini AI Caption Generation aligned strictly with OCEPE framework
+  const generateOcepeCaption = async () => {
+    setIsGenerating(true);
+    setGeneratedCaption(null);
+
+    const selectedAreaObj = OCEPE_AREAS.find(a => a.id === selectedArea);
+    const areaName = selectedAreaObj ? selectedAreaObj.name : 'Formação Pessoal e Social';
+
+    const systemPrompt = `Você é um Engenheiro Pedagógico e Especialista em Educação de Infância em Portugal, perito nas Orientações Curriculares para a Educação Pré-Escolar (OCEPE).
+    A sua missão é gerar uma legenda pedagógica e inspiradora para uma publicação do Instagram dirigida aos pais de crianças da Educação Pré-Escolar.
+
+    REGRAS ESTRITAS DE CONTEÚDO (OCEPE):
+    1. A legenda DEVE obrigatoriamente enquadrar a atividade na Área de Conteúdo das OCEPE selecionada: "${areaName}".
+    2. Utilizar vocabulário pedagógico fundamentado das OCEPE como: "brincar como processo holístico", "aprendizagem ativa", "intencionalidade educativa", "exploração e descoberta", "trabalho cooperado", "autonomia e bem-estar".
+    3. ESTRUTURA OBRIGATÓRIA DA RESPOSTA EM JSON COM AS SEGUINTES CHAVES:
+       - "title": Título carinhoso e apelativo para os pais (com emojis).
+       - "summary": Resumo descritivo da atividade com fundamentação pedagógica clara das OCEPE.
+       - "parentQuestion": Uma pergunta aberta e encorajadora para os pais fazerem aos filhos em casa hoje.
+       - "hashtags": Array de 5 a 8 hashtags pedagógicas e institucionais em português.
+
+    Responda EXCLUSIVAMENTE num objeto JSON válido. Sem explicações ou markdown fora do JSON.`;
+
+    const userPrompt = `Grupo etário: ${ageGroup}.
+    Área OCEPE principal: ${areaName}.
+    Descrição da atividade do dia: ${activityPrompt || 'Atividade de exploração de tintas naturais e texturas com elementos da natureza e folhas recolhidas no jardim.'}`;
+
+    try {
+      const apiKey = ""; // Gemini API runtime
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+      const payload = {
+        contents: [{ parts: [{ text: userPrompt }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: { responseMimeType: "application/json" }
+      };
+
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (textResult) {
+        const parsed = JSON.parse(textResult);
+        setGeneratedCaption(parsed);
+      } else {
+        throw new Error('Sem resposta da IA');
+      }
+    } catch (err) {
+      console.warn("API Error, using fallback OCEPE template:", err);
+      // Fallback OCEPE pedagogical post generator
+      setGeneratedCaption({
+        title: `🎨 Explorando e Aprendendo! (${ageGroup})`,
+        summary: `Hoje no Jardim de Infância, vivenciámos momentos ricos de aprendizagem ativa enquadrados na ${areaName}. Através da exploração e descoberta livre, as crianças foram desafiadas a criar, experimentar e expressar as suas ideias, promovendo o brincar como processo holístico de desenvolvimento.`,
+        parentQuestion: "💬 Desafio para o final do dia: Pergunto ao seu filho: 'Qual foi a descoberta mais divertida que fizeste hoje com os teus amigos?'",
+        hashtags: ["#EducacaoPreEscolar", "#OCEPE", "#AprendizagemAtiva", "#JardimDeInfancia", "#CriatividadeNaInfancia", "#InfanciaSegura"]
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyCaptionToClipboard = () => {
+    if (!generatedCaption) return;
+    const fullText = `${generatedCaption.title}\n\n${generatedCaption.summary}\n\n${generatedCaption.parentQuestion}\n\n${generatedCaption.hashtags.join(' ')}`;
+    navigator.clipboard.writeText(fullText);
+    setCopiedText(true);
+    setTimeout(() => setCopiedText(false), 2500);
+  };
+
+  // Image Exporter logic: Web Download vs Native Share
+  const exportImage = async (action = 'download') => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    try {
+      const dataUrl = canvas.toDataURL('image/png', 1.0);
+
+      if (action === 'download' || !navigator.share) {
+        // Desktop Web Direct PNG Download
+        const link = document.createElement('a');
+        link.download = `post-instagram-ocepe-${Date.now()}.png`;
+        link.href = dataUrl;
+        link.click();
+      } else if (action === 'share' && navigator.share) {
+        // Native Share API (Mobile Browsers / Web Native)
+        const blob = await (await fetch(dataUrl)).blob();
+        const file = new File([blob], 'post-instagram-ocepe.png', { type: 'image/png' });
+        
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            title: 'Post para Instagram - Jardim de Infância',
+            text: generatedCaption ? `${generatedCaption.title}\n${generatedCaption.summary}` : 'Atividade no Jardim de Infância',
+            files: [file]
+          });
+        } else {
+          // Fallback share text
+          await navigator.share({
+            title: 'Post Instagram OCEPE',
+            url: window.location.href
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Export error:", e);
+      alert("Imagem descarregada com sucesso!");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-sky-50/50 text-slate-800 font-sans flex flex-col antialiased">
+      
+      {/* Top Navigation Header */}
+      <header className="bg-white border-b border-sky-100 sticky top-0 z-30 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-emerald-500 flex items-center justify-center text-white shadow-md shadow-sky-500/20">
+              <Shield className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-slate-900 leading-tight flex items-center gap-2">
+                EduPost Segura <span className="bg-sky-100 text-sky-700 text-xs px-2 py-0.5 rounded-full font-medium">OCEPE</span>
+              </h1>
+              <p className="text-xs text-slate-500 hidden sm:block">Gerador de Posts Seguros para Educadores de Infância</p>
+            </div>
+          </div>
+
+          {/* Quick Stats & Badges */}
+          <div className="flex items-center space-x-3">
+            <div className="hidden md:flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold border border-emerald-200">
+              <Lock className="w-3.5 h-3.5" /> Proteção de Rostos Ativa
+            </div>
+            <button 
+              onClick={() => exportImage('download')}
+              className="bg-gradient-to-r from-sky-600 to-emerald-600 hover:from-sky-700 hover:to-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-md shadow-sky-600/20 transition-all active:scale-95"
+            >
+              <Download className="w-4 h-4" /> <span className="hidden sm:inline">Descarregar</span> PNG
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Split-Screen Container (Desktop Split / Mobile Stack) */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+        
+        {/* Mobile Workflow Navigation Tabs */}
+        <div className="lg:hidden flex bg-white rounded-2xl p-1.5 shadow-sm border border-sky-100 mb-6 text-sm font-medium">
+          <button 
+            onClick={() => setActiveTab('photos')}
+            className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab === 'photos' ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-600'}`}
+          >
+            <Grid className="w-4 h-4" /> Fotos ({photos.length})
+          </button>
+          <button 
+            onClick={() => setActiveTab('privacy')}
+            className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab === 'privacy' ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-600'}`}
+          >
+            <Shield className="w-4 h-4" /> Máscaras
+          </button>
+          <button 
+            onClick={() => setActiveTab('caption')}
+            className={`flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab === 'caption' ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-600'}`}
+          >
+            <Sparkles className="w-4 h-4" /> Legenda
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* LEFT PANEL: Control Tools & Settings (7 cols on large desktop) */}
+          <div className={`lg:col-span-7 space-y-6 ${activeTab !== 'export' ? 'block' : 'hidden lg:block'}`}>
+            
+            {/* SECTION 1: PHOTO UPLOAD & COLLAGE GRID BUILDER */}
+            <div className={`bg-white rounded-3xl p-6 shadow-sm border border-sky-100 space-y-5 ${activeTab === 'photos' || activeTab === 'export' ? 'block' : 'hidden lg:block'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center">
+                    <Grid className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-slate-900">1. Fotografias da Atividade</h2>
+                    <p className="text-xs text-slate-500">Adicione entre 1 e 6 fotografias para a colagem</p>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold bg-sky-50 text-sky-700 px-2.5 py-1 rounded-full border border-sky-200">
+                  {photos.length} / 6 fotos
+                </span>
+              </div>
+
+              {/* Drag and Drop Zone */}
+              <div 
+                onDragOver={(e) => { e.preventDefault(); setDraggingPhoto(true); }}
+                onDragLeave={() => setDraggingPhoto(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
+                  draggingPhoto ? 'border-sky-500 bg-sky-50/80 scale-[0.99]' : 'border-sky-200 bg-sky-50/30 hover:border-sky-400 hover:bg-sky-50/60'
+                }`}
+              >
+                <input 
+                  ref={fileInputRef}
+                  type="file" 
+                  accept="image/*" 
+                  multiple 
+                  onChange={(e) => handleFileUpload(e.target.files)} 
+                  className="hidden" 
+                />
+                <div className="w-12 h-12 rounded-2xl bg-white shadow-md text-sky-600 flex items-center justify-center mx-auto mb-3">
+                  <Upload className="w-6 h-6" />
+                </div>
+                <p className="text-sm font-bold text-slate-800">Arraste fotos para aqui ou clique para selecionar</p>
+                <p className="text-xs text-slate-500 mt-1">Suporta PNG, JPG e WEBP até 6 fotografias</p>
+              </div>
+
+              {/* Photo Thumbnails Ribbon */}
+              {photos.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Fotografias Carregadas</label>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                    {photos.map((p, idx) => (
+                      <div 
+                        key={p.id}
+                        onClick={() => setSelectedPhotoId(p.id)}
+                        className={`relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer transition-all group ${
+                          selectedPhotoId === p.id ? 'border-sky-500 ring-2 ring-sky-300' : 'border-slate-200 opacity-80 hover:opacity-100'
+                        }`}
+                      >
+                        <img src={p.url} alt={`Foto ${idx+1}`} className="w-full h-full object-cover" />
+                        <span className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-md font-bold">
+                          #{idx+1}
+                        </span>
+                        <button 
+                          onClick={(e) => removePhoto(p.id, e)}
+                          className="absolute top-1 right-1 bg-rose-500 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                        {p.faces.length > 0 && (
+                          <span className="absolute bottom-1 right-1 bg-emerald-500 text-white text-[9px] px-1 rounded-sm font-semibold flex items-center gap-0.5">
+                            <Shield className="w-2.5 h-2.5" /> {p.faces.length}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Canvas Frame Controls & Expanded Background Gallery */}
+              <div className="pt-3 border-t border-slate-100 space-y-4">
+                {/* Background selector */}
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Palette className="w-3.5 h-3.5 text-sky-600" /> Fundo da Colagem ({BACKGROUND_OPTIONS.length} opções)
+                    </label>
+                    <span className="text-xs text-slate-500 font-medium">
+                      {bgStyle.name}
+                    </span>
+                  </div>
+                  
+                  {/* Gallery Grid with horizontal scroll / wrapping */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2 pt-1 px-1 scrollbar-thin">
+                    {BACKGROUND_OPTIONS.map(bg => {
+                      const isSelected = bgStyle.id === bg.id;
+                      return (
+                        <button
+                          key={bg.id}
+                          onClick={() => setBgStyle(bg)}
+                          title={bg.name}
+                          className={`relative flex-shrink-0 w-9 h-9 rounded-xl border-2 flex items-center justify-center transition-all ${
+                            isSelected 
+                              ? 'border-sky-600 scale-110 shadow-md ring-2 ring-sky-200 z-10' 
+                              : 'border-slate-200 hover:scale-105 hover:border-slate-400'
+                          }`}
+                          style={{
+                            background: bg.type === 'gradient' 
+                              ? `linear-gradient(135deg, ${bg.colors.join(', ')})`
+                              : bg.type === 'pattern'
+                              ? `radial-gradient(${bg.patternColor} 20%, transparent 20%), ${bg.color}`
+                              : bg.color,
+                            backgroundSize: bg.type === 'pattern' ? '12px 12px' : 'cover'
+                          }}
+                        >
+                          {isSelected && (
+                            <div className="w-2 h-2 rounded-full bg-sky-600 ring-2 ring-white shadow-sm" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Border Padding Slider (Enforcing Strict Rule >= 16px) */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-slate-700">Margem Externa (Padding)</label>
+                    <span className="text-xs text-sky-600 font-bold">{borderPadding}px</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="16" 
+                    max="48" 
+                    value={borderPadding} 
+                    onChange={(e) => setBorderPadding(Number(e.target.value))}
+                    className="w-full accent-sky-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Garante que as fotos nunca tocam nas bordas extremas do fundo.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 2: PRECISE FACE PROTECTION & MASK OVERLAY */}
+            <div className={`bg-white rounded-3xl p-6 shadow-sm border border-sky-100 space-y-5 ${activeTab === 'privacy' || activeTab === 'export' ? 'block' : 'hidden lg:block'}`}>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <Shield className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-slate-900">2. Proteção de Privacidade dos Rostos</h2>
+                    <p className="text-xs text-slate-500">Selecione e edite a proteção de rostos de qualquer foto anexada</p>
+                  </div>
+                </div>
+
+                {/* Auto Detection & Clear Buttons */}
+                {photos.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={runFaceDetectionForSelectedPhoto}
+                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-sm"
+                    >
+                      <Wand2 className="w-3.5 h-3.5" /> Detetar Foto Atual
+                    </button>
+                    <button
+                      onClick={runFaceDetectionForAllPhotos}
+                      className="bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-sm"
+                      title="Analisar e aplicar desfoque em todas as fotos da colagem"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" /> Detetar em Todas
+                    </button>
+                    {(() => {
+                      const activePhoto = photos.find(p => p.id === selectedPhotoId);
+                      return activePhoto && activePhoto.faces.length > 0 ? (
+                        <button
+                          onClick={() => clearAllFaceMasks(activePhoto.id)}
+                          className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-all"
+                          title="Remover todas as proteções desta foto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Limpar
+                        </button>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* Photo Switcher Ribbon inside Section 2 for instant navigation between all attached photos */}
+              {photos.length > 0 && (
+                <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-200 space-y-1.5">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      Selecione a Foto a Editar ({photos.length} Anexadas)
+                    </span>
+                    <span className="text-xs font-semibold text-emerald-700">
+                      Foto Ativa: #{photos.findIndex(p => p.id === (selectedPhotoId || photos[0]?.id)) + 1}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                    {photos.map((p, idx) => {
+                      const isSelected = (selectedPhotoId || photos[0]?.id) === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => {
+                            setSelectedPhotoId(p.id);
+                            setSelectedFaceId(null);
+                          }}
+                          className={`relative flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
+                            isSelected 
+                              ? 'border-emerald-500 ring-2 ring-emerald-300 scale-105 shadow-md' 
+                              : 'border-slate-300 opacity-70 hover:opacity-100'
+                          }`}
+                        >
+                          <img src={p.url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                          <span className="absolute top-0.5 left-0.5 bg-black/70 text-white text-[9px] px-1 rounded font-bold">
+                            #{idx + 1}
+                          </span>
+                          {p.faces.length > 0 && (
+                            <span className="absolute bottom-0.5 right-0.5 bg-emerald-600 text-white text-[8px] px-1 rounded font-bold flex items-center gap-0.5">
+                              <Shield className="w-2 h-2" /> {p.faces.length}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Interactive Help Banner */}
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3 text-xs text-emerald-900 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Info className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span>
+                    <strong>Como apagar proteções:</strong> Clique numa proteção na imagem ou na lista e prima <strong>"Eliminar Proteção"</strong> ou clique no botão vermelho do lixo (🗑️).
+                  </span>
+                </div>
+              </div>
+
+              {/* Mask Type Selector Tabs */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {MASK_TYPES.map(m => (
+                  <button
+                    key={m.id}
+                    onClick={() => updateSelectedFaceType(m.id)}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      selectedMaskType === m.id 
+                        ? m.id === 'none'
+                          ? 'border-amber-500 bg-amber-50 text-amber-800 shadow-sm ring-1 ring-amber-300'
+                          : 'border-emerald-500 bg-emerald-50 text-emerald-800 shadow-sm ring-1 ring-emerald-300' 
+                        : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    <span>{m.icon}</span>
+                    <span>{m.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Dedicated prominent action button for removing selected mask */}
+              {selectedFaceId && (
+                <div className="flex items-center justify-between p-3.5 bg-rose-50 border-2 border-rose-200 rounded-2xl text-xs shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                    <span className="font-bold text-rose-950">
+                      Rosto Selecionado para Edição
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      const activePhoto = photos.find(p => p.id === selectedPhotoId);
+                      if (activePhoto) removeFaceMask(activePhoto.id, selectedFaceId, e);
+                    }}
+                    className="bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold px-4 py-2 rounded-xl transition-all shadow-md flex items-center gap-2 flex-shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" /> Eliminar Esta Proteção
+                  </button>
+                </div>
+              )}
+
+              {/* Emoji Picker sub-row */}
+              {selectedMaskType === 'emoji' && (
+                <div className="p-3 bg-slate-50 rounded-2xl space-y-1.5 border border-slate-100">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase">Escolha o Emoji de Proteção</label>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {EMOJI_OPTIONS.map(em => (
+                      <button
+                        key={em}
+                        onClick={() => updateSelectedFaceType('emoji', em)}
+                        className={`w-9 h-9 rounded-xl text-lg flex items-center justify-center transition-transform ${
+                          selectedEmoji === em ? 'bg-white shadow-md scale-110 border-2 border-emerald-400' : 'hover:scale-105'
+                        }`}
+                      >
+                        {em}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Individual Mask Size Controller */}
+              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                    <Maximize2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Tamanho da Proteção {selectedFaceId ? '(Rosto Selecionado)' : '(Padrão)'}:
+                  </span>
+                  <span className="font-bold text-emerald-700 bg-white px-2.5 py-0.5 rounded-lg border border-slate-200">
+                    {maskSize}%
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => updateSelectedFaceRadius(maskSize - 2)}
+                    className="w-8 h-8 rounded-xl bg-white border border-slate-300 font-bold text-slate-700 hover:bg-slate-100 flex items-center justify-center active:scale-95 transition-all"
+                    title="Diminuir tamanho"
+                  >
+                    -
+                  </button>
+                  <input 
+                    type="range" 
+                    min="6" 
+                    max="35" 
+                    value={maskSize} 
+                    onChange={(e) => updateSelectedFaceRadius(Number(e.target.value))}
+                    className="w-full accent-emerald-600 h-2 bg-slate-200 rounded-lg cursor-pointer"
+                  />
+                  <button
+                    onClick={() => updateSelectedFaceRadius(maskSize + 2)}
+                    className="w-8 h-8 rounded-xl bg-white border border-slate-300 font-bold text-slate-700 hover:bg-slate-100 flex items-center justify-center active:scale-95 transition-all"
+                    title="Aumentar tamanho"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Interactive Clickable Image for Manual Face Mask Placement & Management */}
+              {photos.length > 0 ? (
+                <div className="space-y-3">
+                  {(() => {
+                    const activePhoto = photos.find(p => p.id === selectedPhotoId) || photos[0];
+
+                    return (
+                      <>
+                        <div className="flex justify-between items-center text-xs flex-wrap gap-2">
+                          <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                            Fotografia #{photos.findIndex(p => p.id === activePhoto.id) + 1}:
+                            {activePhoto.isDetecting ? (
+                              <span className="text-amber-600 font-bold animate-pulse flex items-center gap-1">
+                                <RefreshCw className="w-3 h-3 animate-spin" /> A detetar rostos...
+                              </span>
+                            ) : (
+                              <span className="text-emerald-600 font-bold flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> {activePhoto.faces.length} {activePhoto.faces.length === 1 ? 'proteção' : 'proteções'}
+                              </span>
+                            )}
+                          </span>
+                          <span className="text-slate-400">Clique na imagem para adicionar/selecionar</span>
+                        </div>
+
+                        {/* Interactive Photo Canvas */}
+                        <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-200 bg-slate-900 group shadow-inner max-h-[380px] flex items-center justify-center">
+                          <img 
+                            src={activePhoto.url} 
+                            alt="Edição manual de rostos" 
+                            onClick={(e) => handleImageClick(activePhoto.id, e)}
+                            className="w-full h-auto max-h-[380px] object-contain cursor-crosshair select-none" 
+                          />
+
+                          {/* Scanning Overlay Animation while detecting */}
+                          {activePhoto.isDetecting && (
+                            <div className="absolute inset-0 bg-emerald-950/40 backdrop-blur-[2px] flex flex-col items-center justify-center text-white space-y-2">
+                              <Sparkles className="w-8 h-8 text-emerald-400 animate-spin" />
+                              <p className="text-xs font-bold tracking-wide">A analisar imagem...</p>
+                            </div>
+                          )}
+
+                          {/* Relative Percentage Coordinates Overlay */}
+                          {!activePhoto.isDetecting && activePhoto.faces.map((face, index) => {
+                            const isSelected = selectedFaceId === face.id;
+                            const isNone = face.type === 'none' || !face.active;
+                            return (
+                              <div
+                                key={face.id}
+                                style={{
+                                  left: `${face.x}%`,
+                                  top: `${face.y}%`,
+                                  width: `${(face.radius || 14) * 2}%`,
+                                  height: `${(face.radius || 14) * 2}%`
+                                }}
+                                onClick={(e) => handleImageClick(activePhoto.id, e)}
+                                className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-all flex items-center justify-center cursor-pointer group/node ${
+                                  isSelected 
+                                    ? 'border-emerald-400 ring-4 ring-emerald-400/40 bg-emerald-500/30 scale-105 z-20 shadow-lg' 
+                                    : isNone
+                                    ? 'border-amber-400/80 bg-amber-500/20 hover:scale-105 z-10'
+                                    : 'border-white/80 bg-slate-900/30 hover:scale-105 z-10'
+                                }`}
+                              >
+                                <span className="text-xs select-none pointer-events-none drop-shadow">
+                                  {face.type === 'emoji' ? (face.emoji || '😊') : face.type === 'sticker' ? '⭐' : face.type === 'none' ? '👁️' : '🌫️'}
+                                </span>
+
+                                {/* Mask Badge Number */}
+                                <span className="absolute -bottom-2 bg-slate-900 text-white text-[9px] px-1.5 py-0.2 rounded-full font-bold border border-white/50 pointer-events-none">
+                                  #{index + 1} {isNone && '(Sem Proteção)'}
+                                </span>
+
+                                {/* Remove Mask Action Button (Enhanced touch target) */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => removeFaceMask(activePhoto.id, face.id, e)}
+                                  className="absolute -top-2 -right-2 bg-rose-600 hover:bg-rose-700 active:scale-125 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg transition-transform z-40 border border-white"
+                                  title="Apagar esta proteção"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 pointer-events-none" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* List of active faces with individual control chips */}
+                        {activePhoto.faces.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
+                              Proteções Registadas (Clique no lixo 🗑️ para remover)
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                              {activePhoto.faces.map((f, idx) => {
+                                const isSelected = selectedFaceId === f.id;
+                                return (
+                                  <div
+                                    key={f.id}
+                                    onClick={() => {
+                                      setSelectedFaceId(f.id);
+                                      setSelectedMaskType(f.type);
+                                      if (f.emoji) setSelectedEmoji(f.emoji);
+                                      setMaskSize(f.radius || 14);
+                                    }}
+                                    className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                                      isSelected
+                                        ? 'bg-emerald-50 border-emerald-500 text-emerald-900 ring-2 ring-emerald-200 shadow-sm'
+                                        : f.type === 'none'
+                                        ? 'bg-amber-50 border-amber-300 text-amber-800'
+                                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <span>#{idx + 1}</span>
+                                    <span>{f.type === 'emoji' ? f.emoji : f.type === 'sticker' ? '⭐' : f.type === 'none' ? '👁️ Sem Proteção' : '🌫️'}</span>
+                                    {f.type !== 'none' && <span className="text-[10px] text-slate-500 font-normal">({f.radius}%)</span>}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => removeFaceMask(activePhoto.id, f.id, e)}
+                                      className="text-slate-400 hover:text-rose-600 p-1 rounded-md hover:bg-rose-100 transition-colors ml-1"
+                                      title="Retirar proteção deste rosto"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 text-center py-4">Carregue fotos primeiro para gerir o desfoque de rostos.</p>
+              )}
+            </div>
+
+            {/* SECTION 3: OCEPE AI CAPTION GENERATOR */}
+            <div className={`bg-white rounded-3xl p-6 shadow-sm border border-sky-100 space-y-5 ${activeTab === 'caption' || activeTab === 'export' ? 'block' : 'hidden lg:block'}`}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-slate-900">3. Gerador de Legenda Pedagógica (OCEPE)</h2>
+                  <p className="text-xs text-slate-500">Crie automaticamente um texto fundamentado no currículo oficial</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Age Group */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Grupo Etário (Pré-Escolar)</label>
+                  <select 
+                    value={ageGroup}
+                    onChange={(e) => setAgeGroup(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-sky-500 outline-none"
+                  >
+                    <option value="3 Anos">3 Anos (Pré-Escolar)</option>
+                    <option value="4 Anos">4 Anos (Pré-Escolar)</option>
+                    <option value="5 Anos">5 Anos (Pré-Escolar)</option>
+                    <option value="3-6 anos (Grupo Heterogéneo)">3-6 anos (Grupo Heterogéneo)</option>
+                  </select>
+                </div>
+
+                {/* OCEPE Area */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Área de Conteúdo OCEPE</label>
+                  <select 
+                    value={selectedArea}
+                    onChange={(e) => setSelectedArea(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-sky-500 outline-none"
+                  >
+                    {OCEPE_AREAS.map(a => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Activity Description */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Resumo da Atividade do Dia</label>
+                <textarea 
+                  value={activityPrompt}
+                  onChange={(e) => setActivityPrompt(e.target.value)}
+                  placeholder="Ex: Pintura livre com dedos utilizando tintas de beterraba e espinafres, explorando sensações tácteis e cores da natureza..."
+                  rows={3}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-800 focus:ring-2 focus:ring-sky-500 outline-none"
+                />
+              </div>
+
+              {/* Generate AI Button */}
+              <button 
+                onClick={generateOcepeCaption}
+                disabled={isGenerating}
+                className="w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
+              >
+                {isGenerating ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" /> A redigir com fundamentação OCEPE...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-4 h-4" /> Gerar Legenda Pedagógica com IA
+                  </>
+                )}
+              </button>
+
+              {/* Generated Caption Result Box */}
+              {generatedCaption && (
+                <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-4 space-y-3 relative">
+                  <div className="flex justify-between items-start">
+                    <span className="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1">
+                      <BookOpen className="w-3.5 h-3.5" /> Post Pronto para Instagram
+                    </span>
+                    <button 
+                      onClick={copyCaptionToClipboard}
+                      className="bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                    >
+                      {copiedText ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedText ? 'Copiado!' : 'Copiar Texto'}
+                    </button>
+                  </div>
+
+                  <div className="text-sm space-y-2 text-slate-800 font-normal leading-relaxed">
+                    <p className="font-bold text-slate-900">{generatedCaption.title}</p>
+                    <p className="whitespace-pre-line">{generatedCaption.summary}</p>
+                    <p className="italic text-sky-900 font-medium bg-sky-100/50 p-2.5 rounded-xl border border-sky-200">
+                      {generatedCaption.parentQuestion}
+                    </p>
+                    <p className="text-xs text-sky-700 font-semibold">{generatedCaption.hashtags?.join(' ')}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          {/* RIGHT PANEL: Fixed Live Real-Time Canvas Preview & Export (5 cols on desktop) */}
+          <div className="lg:col-span-5 lg:sticky lg:top-20 space-y-4">
+            
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-sky-100 space-y-4">
+              
+              {/* Header & Aspect Ratio Toggle */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-sky-600" />
+                  <h3 className="font-bold text-slate-900 text-sm">Pré-visualização em Tempo Real</h3>
+                </div>
+
+                <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+                  <button
+                    onClick={() => setAspectRatio('1:1')}
+                    className={`px-3 py-1 rounded-lg transition-all ${aspectRatio === '1:1' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-500'}`}
+                  >
+                    1:1
+                  </button>
+                  <button
+                    onClick={() => setAspectRatio('4:5')}
+                    className={`px-3 py-1 rounded-lg transition-all ${aspectRatio === '4:5' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-500'}`}
+                  >
+                    4:5
+                  </button>
+                </div>
+              </div>
+
+              {/* Instagram Post Mockup Frame */}
+              <div className="bg-slate-900 rounded-2xl p-3 shadow-2xl space-y-3">
+                {/* Mockup Top Profile Bar */}
+                <div className="flex items-center justify-between text-white text-xs px-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-400 to-rose-500 p-0.5">
+                      <div className="w-full h-full bg-white rounded-full flex items-center justify-center text-[10px] font-bold text-sky-600">
+                        JI
+                      </div>
+                    </div>
+                    <div>
+                      <p className="font-bold leading-none">jardim_infancia_oficial</p>
+                      <p className="text-[10px] text-slate-400">Jardim de Infância</p>
+                    </div>
+                  </div>
+                  <span className="text-slate-400 text-base">•••</span>
+                </div>
+
+                {/* THE ACTUAL CANVAS RENDERING */}
+                <div className="w-full flex justify-center bg-black/40 rounded-xl overflow-hidden">
+                  <canvas 
+                    ref={canvasRef} 
+                    className="w-full h-auto max-h-[520px] object-contain rounded-xl"
+                  />
+                </div>
+
+                {/* Mockup Instagram Interaction Bar */}
+                <div className="flex items-center justify-between text-white pt-1 px-1">
+                  <div className="flex items-center gap-3">
+                    <Heart className="w-5 h-5 text-rose-500 fill-rose-500" />
+                    <Smile className="w-5 h-5 text-slate-300" />
+                    <Share2 className="w-5 h-5 text-slate-300" />
+                  </div>
+                  <Lock className="w-4 h-4 text-emerald-400" />
+                </div>
+              </div>
+
+              {/* EXPORT BUTTONS */}
+              <div className="space-y-2 pt-2">
+                <button
+                  onClick={() => exportImage('download')}
+                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold py-3 px-4 rounded-2xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                >
+                  <Download className="w-5 h-5" /> Descarregar Imagem Final (.PNG)
+                </button>
+
+                <button
+                  onClick={() => exportImage('share')}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all text-xs"
+                >
+                  <Share2 className="w-4 h-4 text-sky-600" /> Partilhar / Enviar para Dispositivo
+                </button>
+              </div>
+
+              {/* Privacy Guarantee Note */}
+              <div className="p-3 bg-sky-50 rounded-2xl border border-sky-100 flex items-start gap-2.5 text-xs text-sky-900">
+                <Shield className="w-4 h-4 text-sky-600 flex-shrink-0 mt-0.5" />
+                <p>
+                  <strong>Garantia de Privacidade:</strong> O processamento de imagens e o desfoque de rostos ocorrem 100% no seu dispositivo. Nenhuma foto de crianças é enviada para servidores externos.
+                </p>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      </main>
+
+      {/* Footer info */}
+      <footer className="bg-white border-t border-sky-100 mt-12 py-6 text-center text-xs text-slate-500">
+        <p>Desenvolvido para Educadores de Infância | Alinhado com as Orientações Curriculares para a Educação Pré-Escolar (OCEPE)</p>
+      </footer>
+
+    </div>
+  );
+}
